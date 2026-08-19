@@ -1,0 +1,117 @@
+# Video Recording
+
+Use `record` to capture browser automation as a WebM or MP4 video for debugging, CI evidence, product walkthroughs, or repro reports.
+
+## Basic workflow
+
+```bash
+agent-browser open https://example.com
+agent-browser record start ./demo.webm
+agent-browser snapshot -i
+agent-browser click @e1
+
+agent-browser record stop
+```
+
+After launching a session, `record start` can also navigate immediately:
+
+```bash
+agent-browser open
+agent-browser record start ./demo.webm https://example.com
+```
+
+If no URL is provided, recording starts from the current page. The recording context copies cookies from the active session.
+
+## Commands
+
+<table>
+  <thead>
+    <tr><th>Command</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>record start &lt;path.webm|path.mp4&gt; [url] [options]</code></td><td>Start recording to a WebM or MP4 file</td></tr>
+    <tr><td><code>record stop</code></td><td>Stop the active recording and save the file</td></tr>
+    <tr><td><code>record restart &lt;path.webm|path.mp4&gt; [url] [options]</code></td><td>Stop the current recording and immediately start another</td></tr>
+  </tbody>
+</table>
+
+## Recording quality
+
+Recording defaults to 10 fps, JPEG capture quality 80, VP8 for WebM output, and H.264 for MP4 output. Use the quality options when you need smoother or less compressed video:
+
+```bash
+agent-browser record start ./demo.mp4 --fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264
+```
+
+<table>
+  <thead>
+    <tr><th>Option</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>--fps &lt;1-60&gt;</code></td><td>Set the screenshot capture and output frame rate</td></tr>
+    <tr><td><code>--quality &lt;0-100&gt;</code></td><td>Set the JPEG quality used for captured frames</td></tr>
+    <tr><td><code>--bitrate &lt;rate&gt;</code></td><td>Set the ffmpeg video bitrate, such as <code>6M</code></td></tr>
+    <tr><td><code>--crf &lt;0-63&gt;</code></td><td>Set the codec constant rate factor</td></tr>
+    <tr><td><code>--codec &lt;h264|vp8|vp9&gt;</code></td><td>Override the codec selected from the output extension</td></tr>
+  </tbody>
+</table>
+
+## CI evidence
+
+```bash
+#!/bin/bash
+set -e
+
+cleanup() {
+  agent-browser record stop 2>/dev/null || true
+  agent-browser close 2>/dev/null || true
+}
+trap cleanup EXIT
+
+agent-browser open https://app.example.com/login
+agent-browser record start "./artifacts/login-flow.webm"
+agent-browser snapshot -i
+agent-browser fill @e1 "demo@example.com"
+agent-browser fill @e2 "password"
+agent-browser click @e3
+agent-browser wait --url "**/dashboard"
+```
+
+Keep recordings as CI artifacts when browser failures are hard to diagnose from text output alone.
+
+## Human-readable demos
+
+Add small waits when the video is meant for a person to watch:
+
+```bash
+agent-browser open https://shop.example.com
+agent-browser record start ./checkout.webm
+agent-browser wait 500
+agent-browser click @e4
+agent-browser wait 500
+agent-browser screenshot ./screenshots/cart.png
+agent-browser record stop
+```
+
+Screenshots and videos work well together: screenshots capture precise still states, while the video shows timing, transitions, and unexpected overlays.
+
+## Output format
+
+<table>
+  <thead>
+    <tr><th>Property</th><th>Value</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Container</td><td>WebM or MP4</td></tr>
+    <tr><td>Common extension</td><td><code>.webm</code> or <code>.mp4</code></td></tr>
+    <tr><td>Viewport</td><td>Uses the active browser viewport settings</td></tr>
+    <tr><td>State</td><td>Copies cookies from the active session</td></tr>
+  </tbody>
+</table>
+
+## Limitations
+
+- Recording adds overhead to automation.
+- Long recordings can use significant disk space.
+- Use `record stop` before closing a session if you need the file flushed.
+- Some constrained headless environments may have codec or GPU limitations.

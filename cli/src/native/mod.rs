@@ -1,4 +1,6 @@
 #[allow(dead_code)]
+pub mod a11y;
+#[allow(dead_code)]
 pub mod actions;
 #[allow(dead_code)]
 pub mod auth;
@@ -38,6 +40,8 @@ pub mod state;
 pub mod storage;
 #[allow(dead_code)]
 pub mod stream;
+#[allow(dead_code)]
+pub mod tab_binding;
 #[allow(dead_code)]
 pub mod tracing;
 #[allow(dead_code)]
