@@ -6,6 +6,27 @@ Instructions for AI coding agents working with this codebase.
 
 This project uses **pnpm**. Always use `pnpm` instead of `npm` or `yarn` for installing dependencies, running scripts, etc. (e.g., `pnpm install`, `pnpm run build`).
 
+## Fork Workflow
+
+This repository is a personal fork of `vercel-labs/agent-browser`.
+
+- Treat `upstream` as fetch-only. Never push to the upstream repository.
+- Keep `main` identical to `upstream/main`. Do not commit custom changes to `main` or merge feature branches into it.
+- Keep custom work on `recording-quality-control` or another feature branch.
+- Bring upstream changes into feature branches by fast-forwarding `main`, pushing the mirrored `main` to `origin`, and merging `main` into the feature branch.
+- If `main` cannot fast-forward to `upstream/main`, stop and inspect the divergence. Never force-push `main`.
+
+```bash
+git fetch upstream main
+git switch main
+git merge --ff-only upstream/main
+git push origin main
+
+git switch recording-quality-control
+git merge main
+git push origin recording-quality-control
+```
+
 ## Code Style
 
 - Do not use emojis in code, output, or documentation. Unicode symbols (✓, ✗, →, ⚠) are acceptable.
