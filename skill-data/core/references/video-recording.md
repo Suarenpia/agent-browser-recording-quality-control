@@ -35,12 +35,23 @@ agent-browser record stop
 # Start recording to file
 agent-browser record start ./output.webm
 
+# Start a smoother, higher bitrate MP4 recording
+agent-browser record start ./output.mp4 --fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264
+
 # Stop current recording
 agent-browser record stop
 
 # Restart with new file (stops current + starts new)
 agent-browser record restart ./take2.webm
 ```
+
+Options for `record start` and `record restart`:
+
+- `--fps <1-60>`: capture frames per second. Default is 10.
+- `--quality <0-100>`: JPEG screenshot quality before frames are encoded. Default is 80.
+- `--bitrate <rate>`: ffmpeg video bitrate, for example `6M`.
+- `--crf <0-63>`: ffmpeg constant rate factor. Lower values are larger and higher quality.
+- `--codec <h264|vp8|vp9>`: video codec. Default is H.264 for `.mp4` and VP8 for `.webm`.
 
 ## Use Cases
 
@@ -162,9 +173,9 @@ agent-browser record stop
 
 ## Output Format
 
-- Default format: WebM (VP8/VP9 codec)
-- Compatible with all modern browsers and video players
-- Compressed but high quality
+- Default format: WebM with VP8, 10 fps, JPEG capture quality 80, CRF 30, and 1M bitrate
+- `.mp4` outputs use H.264 by default
+- Use `--fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264` for smoother documentation recordings
 
 ## Limitations
 

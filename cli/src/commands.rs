@@ -220,6 +220,153 @@ fn parse_cookie_header(header: &str) -> Result<Vec<Value>, String> {
     Ok(out)
 }
 
+const RECORD_USAGE: &str = "record <start|restart> <output.webm|output.mp4> [url] [--fps <1-60>] [--quality <0-100>] [--bitrate <rate>] [--crf <0-63>] [--codec <h264|vp8|vp9>]";
+
+fn normalize_recording_url(url: &str) -> String {
+    if url.starts_with("http") || url.contains("://") {
+        return url.to_string();
+    }
+    format!("https://{}", url)
+}
+
+fn parse_recording_number(value: &str, name: &str, usage: &'static str) -> Result<u64, ParseError> {
+    value.parse::<u64>().map_err(|_| ParseError::InvalidValue {
+        message: format!("Invalid {}: '{}' is not a valid integer", name, value),
+        usage,
+    })
+}
+
+fn parse_recording_start_or_restart(
+    action: &str,
+    id: &str,
+    rest: &[&str],
+) -> Result<Value, ParseError> {
+    let path = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
+        context: format!("record {}", rest.first().copied().unwrap_or("start")),
+        usage: RECORD_USAGE,
+    })?;
+    let mut cmd = json!({ "id": id, "action": action, "path": path });
+    let mut options = serde_json::Map::new();
+    let mut url: Option<String> = None;
+    let mut i = 2;
+
+    while i < rest.len() {
+        match rest[i] {
+            "--fps" => {
+                let value = rest
+                    .get(i + 1)
+                    .ok_or_else(|| ParseError::MissingArguments {
+                        context: "record --fps".to_string(),
+                        usage: RECORD_USAGE,
+                    })?;
+                let fps = parse_recording_number(value, "fps", RECORD_USAGE)?;
+                if fps == 0 || fps > 60 {
+                    return Err(ParseError::InvalidValue {
+                        message: format!(
+                            "Invalid fps: {} is out of range (valid range: 1-60)",
+                            fps
+                        ),
+                        usage: RECORD_USAGE,
+                    });
+                }
+                options.insert("fps".to_string(), json!(fps));
+                i += 2;
+            }
+            "--quality" => {
+                let value = rest
+                    .get(i + 1)
+                    .ok_or_else(|| ParseError::MissingArguments {
+                        context: "record --quality".to_string(),
+                        usage: RECORD_USAGE,
+                    })?;
+                let quality = parse_recording_number(value, "quality", RECORD_USAGE)?;
+                if quality > 100 {
+                    return Err(ParseError::InvalidValue {
+                        message: format!(
+                            "Invalid quality: {} is out of range (valid range: 0-100)",
+                            quality
+                        ),
+                        usage: RECORD_USAGE,
+                    });
+                }
+                options.insert("quality".to_string(), json!(quality));
+                i += 2;
+            }
+            "--bitrate" => {
+                let value = rest
+                    .get(i + 1)
+                    .ok_or_else(|| ParseError::MissingArguments {
+                        context: "record --bitrate".to_string(),
+                        usage: RECORD_USAGE,
+                    })?;
+                options.insert("bitrate".to_string(), json!(value));
+                i += 2;
+            }
+            "--crf" => {
+                let value = rest
+                    .get(i + 1)
+                    .ok_or_else(|| ParseError::MissingArguments {
+                        context: "record --crf".to_string(),
+                        usage: RECORD_USAGE,
+                    })?;
+                let crf = parse_recording_number(value, "crf", RECORD_USAGE)?;
+                if crf > 63 {
+                    return Err(ParseError::InvalidValue {
+                        message: format!(
+                            "Invalid crf: {} is out of range (valid range: 0-63)",
+                            crf
+                        ),
+                        usage: RECORD_USAGE,
+                    });
+                }
+                options.insert("crf".to_string(), json!(crf));
+                i += 2;
+            }
+            "--codec" => {
+                let value = rest
+                    .get(i + 1)
+                    .ok_or_else(|| ParseError::MissingArguments {
+                        context: "record --codec".to_string(),
+                        usage: RECORD_USAGE,
+                    })?;
+                if !matches!(*value, "h264" | "vp8" | "vp9") {
+                    return Err(ParseError::InvalidValue {
+                        message: format!("Invalid codec: {} (valid values: h264, vp8, vp9)", value),
+                        usage: RECORD_USAGE,
+                    });
+                }
+                options.insert("codec".to_string(), json!(value));
+                i += 2;
+            }
+            value if value.starts_with("--") => {
+                return Err(ParseError::InvalidValue {
+                    message: format!("Unknown flag for record: {}", value),
+                    usage: RECORD_USAGE,
+                });
+            }
+            value => {
+                if url.is_some() {
+                    return Err(ParseError::InvalidValue {
+                        message: format!("Unexpected argument for record: {}", value),
+                        usage: RECORD_USAGE,
+                    });
+                }
+                url = Some(normalize_recording_url(value));
+                i += 1;
+            }
+        }
+    }
+
+    if let Some(recording_url) = url {
+        cmd["url"] = json!(recording_url);
+    }
+    if !options.is_empty() {
+        cmd["recordingOptions"] = Value::Object(options);
+    }
+
+    Ok(cmd)
+}
+
 pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError> {
     let mut result = parse_command_inner(args, flags)?;
 
@@ -1393,44 +1540,10 @@ fn parse_command_inner(args: &[String], flags: &Flags) -> Result<Value, ParseErr
         "record" => {
             const VALID: &[&str] = &["start", "stop", "restart"];
             match rest.first().copied() {
-                Some("start") => {
-                    let path = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
-                        context: "record start".to_string(),
-                        usage: "record start <output.webm> [url]",
-                    })?;
-                    // Optional URL parameter
-                    let url = rest.get(2);
-                    let mut cmd = json!({ "id": id, "action": "recording_start", "path": path });
-                    if let Some(u) = url {
-                        // Add https:// prefix if needed (preserve special schemes)
-                        let url_str = if u.starts_with("http") || u.contains("://") {
-                            u.to_string()
-                        } else {
-                            format!("https://{}", u)
-                        };
-                        cmd["url"] = json!(url_str);
-                    }
-                    Ok(cmd)
-                }
+                Some("start") => parse_recording_start_or_restart("recording_start", &id, &rest),
                 Some("stop") => Ok(json!({ "id": id, "action": "recording_stop" })),
                 Some("restart") => {
-                    let path = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
-                        context: "record restart".to_string(),
-                        usage: "record restart <output.webm> [url]",
-                    })?;
-                    // Optional URL parameter
-                    let url = rest.get(2);
-                    let mut cmd = json!({ "id": id, "action": "recording_restart", "path": path });
-                    if let Some(u) = url {
-                        // Add https:// prefix if needed (preserve special schemes)
-                        let url_str = if u.starts_with("http") || u.contains("://") {
-                            u.to_string()
-                        } else {
-                            format!("https://{}", u)
-                        };
-                        cmd["url"] = json!(url_str);
-                    }
-                    Ok(cmd)
+                    parse_recording_start_or_restart("recording_restart", &id, &rest)
                 }
                 Some(sub) => Err(ParseError::UnknownSubcommand {
                     subcommand: sub.to_string(),
@@ -1438,7 +1551,7 @@ fn parse_command_inner(args: &[String], flags: &Flags) -> Result<Value, ParseErr
                 }),
                 None => Err(ParseError::MissingArguments {
                     context: "record".to_string(),
-                    usage: "record <start|stop|restart> [path] [url]",
+                    usage: RECORD_USAGE,
                 }),
             }
         }
@@ -3883,6 +3996,57 @@ mod tests {
         assert_eq!(cmd["action"], "recording_start");
         assert_eq!(cmd["path"], "demo.webm");
         assert_eq!(cmd["url"], "chrome-extension://abcdef/popup.html");
+    }
+
+    #[test]
+    fn test_record_start_with_quality_options() {
+        let cmd = parse_command(
+            &args("record start demo.mp4 --fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264"),
+            &default_flags(),
+        )
+        .unwrap();
+        assert_eq!(cmd["action"], "recording_start");
+        assert_eq!(cmd["path"], "demo.mp4");
+        assert_eq!(cmd["recordingOptions"]["fps"], 30);
+        assert_eq!(cmd["recordingOptions"]["quality"], 95);
+        assert_eq!(cmd["recordingOptions"]["bitrate"], "6M");
+        assert_eq!(cmd["recordingOptions"]["crf"], 16);
+        assert_eq!(cmd["recordingOptions"]["codec"], "h264");
+    }
+
+    #[test]
+    fn test_record_start_with_url_and_quality_options() {
+        let cmd = parse_command(
+            &args("record start demo.mp4 example.com --fps 30 --quality 95"),
+            &default_flags(),
+        )
+        .unwrap();
+        assert_eq!(cmd["action"], "recording_start");
+        assert_eq!(cmd["path"], "demo.mp4");
+        assert_eq!(cmd["url"], "https://example.com");
+        assert_eq!(cmd["recordingOptions"]["fps"], 30);
+        assert_eq!(cmd["recordingOptions"]["quality"], 95);
+    }
+
+    #[test]
+    fn test_record_start_rejects_invalid_fps() {
+        let result = parse_command(&args("record start demo.mp4 --fps 0"), &default_flags());
+        assert!(matches!(result, Err(ParseError::InvalidValue { .. })));
+    }
+
+    #[test]
+    fn test_record_start_rejects_invalid_quality() {
+        let result = parse_command(
+            &args("record start demo.mp4 --quality 101"),
+            &default_flags(),
+        );
+        assert!(matches!(result, Err(ParseError::InvalidValue { .. })));
+    }
+
+    #[test]
+    fn test_record_start_rejects_invalid_codec() {
+        let result = parse_command(&args("record start demo.mp4 --codec av1"), &default_flags());
+        assert!(matches!(result, Err(ParseError::InvalidValue { .. })));
     }
 
     #[test]

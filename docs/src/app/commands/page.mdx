@@ -288,7 +288,8 @@ agent-browser trace start [path]      # Start trace
 agent-browser trace stop [path]       # Stop and save trace
 agent-browser profiler start          # Start Chrome DevTools profiling
 agent-browser profiler stop [path]    # Stop and save profile (.json)
-agent-browser record start <path>     # Start video recording (WebM)
+agent-browser record start <path>     # Start video recording (WebM or MP4)
+agent-browser record start ./demo.mp4 --fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264
 agent-browser record stop             # Stop and save video
 agent-browser record restart <path>   # Stop current and start new recording
 agent-browser console                 # View console messages

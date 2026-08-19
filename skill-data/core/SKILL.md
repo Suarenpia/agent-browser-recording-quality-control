@@ -294,6 +294,12 @@ agent-browser click @e3
 agent-browser record stop
 ```
 
+For smoother MP4 output, use recording options on `record start` or `record restart`:
+
+```bash
+agent-browser record start demo.mp4 --fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264
+```
+
 See [references/video-recording.md](references/video-recording.md) for
 codec options, GIF export, and more.
 

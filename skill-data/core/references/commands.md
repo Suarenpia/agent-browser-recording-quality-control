@@ -107,6 +107,7 @@ agent-browser pdf output.pdf      # Save as PDF
 
 ```bash
 agent-browser record start ./demo.webm    # Start recording
+agent-browser record start ./demo.mp4 --fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264
 agent-browser click @e1                   # Perform actions
 agent-browser record stop                 # Stop and save video
 agent-browser record restart ./take2.webm # Stop current + start new

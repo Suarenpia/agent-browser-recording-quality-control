@@ -366,6 +366,9 @@ agent-browser trace start [path]      # Start recording trace
 agent-browser trace stop [path]       # Stop and save trace
 agent-browser profiler start          # Start Chrome DevTools profiling
 agent-browser profiler stop [path]    # Stop and save profile (.json)
+agent-browser record start ./demo.webm  # Start video recording
+agent-browser record start ./demo.mp4 --fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264
+agent-browser record stop             # Stop and save video
 agent-browser console                 # View console messages (log, error, warn, info)
 agent-browser console --json          # JSON output with raw CDP args for programmatic access
 agent-browser console --clear         # Clear console
@@ -382,6 +385,8 @@ agent-browser state clear [name]      # Clear states for session
 agent-browser state clear --all       # Clear all saved states
 agent-browser state clean --older-than <days>  # Delete old states
 ```
+
+Recording defaults to 10 fps, JPEG capture quality 80, VP8 for `.webm`, and H.264 for `.mp4`. Use `--fps`, `--quality`, `--bitrate`, `--crf`, and `--codec h264|vp8|vp9` on `record start` or `record restart` when you need smoother or less compressed video.
 
 ### Navigation
 

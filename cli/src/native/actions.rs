@@ -567,6 +567,7 @@ impl DaemonState {
             client,
             session_id,
             self.recording_state.output_path.clone(),
+            self.recording_state.config.clone(),
             shared_count.clone(),
             cancel_rx,
         );
@@ -4036,6 +4037,7 @@ async fn handle_recording_start(cmd: &Value, state: &mut DaemonState) -> Result<
         .get("url")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty());
+    let recording_config = recording::RecordingConfig::from_value(cmd.get("recordingOptions"))?;
 
     let viewport = state.viewport;
 
@@ -4175,7 +4177,7 @@ async fn handle_recording_start(cmd: &Value, state: &mut DaemonState) -> Result<
         (mgr.client.clone(), new_session_id)
     };
 
-    let result = recording::recording_start(&mut state.recording_state, path)?;
+    let result = recording::recording_start(&mut state.recording_state, path, recording_config)?;
     state.start_recording_task(client, new_session_id).await?;
 
     if let Some(ref server) = state.stream_server {
@@ -4201,9 +4203,10 @@ async fn handle_recording_restart(cmd: &Value, state: &mut DaemonState) -> Resul
         .get("path")
         .and_then(|v| v.as_str())
         .ok_or("Missing 'path' parameter")?;
+    let recording_config = recording::RecordingConfig::from_value(cmd.get("recordingOptions"))?;
 
     let _ = state.stop_recording_task().await;
-    let result = recording::recording_restart(&mut state.recording_state, path)?;
+    let result = recording::recording_restart(&mut state.recording_state, path, recording_config)?;
 
     if let Some(ref browser) = state.browser {
         let session_id = browser.active_session_id()?.to_string();
@@ -6446,7 +6449,11 @@ async fn handle_video_start(cmd: &Value, state: &mut DaemonState) -> Result<Valu
     let mgr = state.browser.as_ref().ok_or("Browser not launched")?;
     let session_id = mgr.active_session_id()?.to_string();
 
-    recording::recording_start(&mut state.recording_state, path)?;
+    recording::recording_start(
+        &mut state.recording_state,
+        path,
+        recording::RecordingConfig::from_value(cmd.get("recordingOptions"))?,
+    )?;
     state
         .start_recording_task(mgr.client.clone(), session_id)
         .await?;

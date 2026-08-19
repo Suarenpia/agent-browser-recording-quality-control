@@ -2277,11 +2277,11 @@ The output file can be viewed in:
             r##"
 agent-browser record - Record browser session to video
 
-Usage: agent-browser record start <path.webm> [url]
+Usage: agent-browser record start <path.webm|path.mp4> [url] [options]
        agent-browser record stop
-       agent-browser record restart <path.webm> [url]
+       agent-browser record restart <path.webm|path.mp4> [url] [options]
 
-Record the browser to a WebM video file.
+Record the browser to a WebM or MP4 video file.
 Creates a fresh browser context but preserves cookies and localStorage.
 If no URL is provided, automatically navigates to your current page.
 
@@ -2289,6 +2289,13 @@ Operations:
   start <path> [url]     Start recording (defaults to current URL if omitted)
   stop                   Stop recording and save video
   restart <path> [url]   Stop current recording (if any) and start a new one
+
+Recording Options:
+  --fps <1-60>           Capture frames per second (default: 10)
+  --quality <0-100>      Browser JPEG capture quality (default: 80)
+  --bitrate <rate>       ffmpeg video bitrate, e.g. 6M
+  --crf <0-63>           ffmpeg constant rate factor
+  --codec <codec>        Video codec: h264, vp8, vp9 (default: h264 for MP4, vp8 for WebM)
 
 Global Options:
   --json               Output as JSON
@@ -2304,6 +2311,9 @@ Examples:
 
   # Or specify a different URL
   agent-browser record start ./demo.webm https://example.com
+
+  # Higher quality MP4 recording
+  agent-browser record start ./demo.mp4 --fps 30 --quality 95 --bitrate 6M --crf 16 --codec h264
 
   # Restart recording with a new file (stops previous, starts new)
   agent-browser record restart ./take2.webm
@@ -2991,7 +3001,7 @@ Diff:
 Debug:
   trace start|stop [path]    Record Chrome DevTools trace
   profiler start|stop [path] Record Chrome DevTools profile
-  record start <path> [url]  Start video recording (WebM)
+  record start <path> [url]  Start video recording (WebM or MP4, supports --fps/--quality/--bitrate)
   record stop                Stop and save video
   console [--clear]          View console logs
   errors [--clear]           View page errors
